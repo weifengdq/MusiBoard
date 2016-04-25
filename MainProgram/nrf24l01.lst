@@ -1,0 +1,182 @@
+C51 COMPILER V9.00   NRF24L01                                                              10/25/2014 16:15:50 PAGE 1   
+
+
+C51 COMPILER V9.00, COMPILATION OF MODULE NRF24L01
+OBJECT MODULE PLACED IN .\OUTPUT\nrf24l01.obj
+COMPILER INVOKED BY: D:\Program Files(x86)\keilC51\C51\BIN\C51.EXE SRC\nrf24l01.c LARGE BROWSE DEBUG OBJECTEXTEND PRINT(
+                    -.\nrf24l01.lst) OBJECT(.\OUTPUT\nrf24l01.obj)
+
+line level    source
+
+   1          #include "nrf24l01.h"
+   2          
+   3          unsigned char  bdata sta;   //×´Ì¬±êÖ¾
+   4          sbit RX_DR =sta^6;
+   5          sbit TX_DS =sta^5;
+   6          sbit MAX_RT =sta^4;
+   7          //*********************************************NRF24L01*************************************
+   8          #define TX_ADR_WIDTH    5    // 5 unsigned ints TX address width
+   9          #define RX_ADR_WIDTH    5    // 5 unsigned ints RX address width
+  10          #define TX_PLOAD_WIDTH  4   // 32 unsigned ints TX payload
+  11          #define RX_PLOAD_WIDTH  4   // 32 unsigned ints TX payload
+  12          unsigned char const TX_ADDRESS[TX_ADR_WIDTH]= {0x34,0x43,0x10,0x10,0x01}; //±¾µØµØÖ·
+  13          unsigned char const RX_ADDRESS[RX_ADR_WIDTH]= {0x34,0x43,0x10,0x10,0x01}; //½ÓÊÕµØÖ·
+  14          
+  15          unsigned char Tx_Buf[TX_PLOAD_WIDTH]={1,2,3,4};//·¢ËÍÊý¾Ý
+  16          unsigned char Rx_Buf[RX_PLOAD_WIDTH];//½ÓÊÕÊý¾Ý
+  17          
+  18          void NRF24L01_Init(void)
+  19          {
+  20   1              CE=0;                                                   //24L01µÄ³õÊ¼»¯
+  21   1              SCK=0;
+  22   1              CSN=1;  
+  23   1      }
+  24          
+  25          /************************************IO ¿ÚÄ£ÄâSPI×ÜÏß ´úÂë************************************************
+             -/
+  26          unsigned char SPI_RW(unsigned char byte)
+  27          {
+  28   1         unsigned char bit_ctr;
+  29   1       for(bit_ctr=0;bit_ctr<8;bit_ctr++)
+  30   1       {
+  31   2         MOSI=(byte&0x80);
+  32   2         
+  33   2         byte=(byte<<1);
+  34   2         SCK=1;
+  35   2         byte|=MISO;
+  36   2           SCK=0;
+  37   2       }
+  38   1       return(byte);
+  39   1      }
+  40          unsigned char SPI_RW_Reg  (unsigned char  reg,unsigned char value) // Ïò¼Ä´æÆ÷REGÐ´Ò»¸ö×Ö½Ú£¬Í¬Ê±·µ»Ø×´Ì¬×
+             -Ö½Ú
+  41          {
+  42   1          unsigned char status;
+  43   1        CSN=0;
+  44   1        status=SPI_RW(reg);
+  45   1          SPI_RW(value);
+  46   1        CSN=1;
+  47   1        return(status);
+  48   1      }
+  49          unsigned char SPI_Read (unsigned char  reg )
+  50          {
+  51   1          unsigned char reg_val;
+  52   1        CSN=0;
+C51 COMPILER V9.00   NRF24L01                                                              10/25/2014 16:15:50 PAGE 2   
+
+  53   1        SPI_RW(reg);
+  54   1         reg_val=SPI_RW(0);
+  55   1        CSN=1;
+  56   1        return(reg_val);
+  57   1      }
+  58          unsigned char SPI_Write_Buf(unsigned char reg, unsigned char *pBuf, unsigned char bytes)
+  59          {
+  60   1       unsigned char status,byte_ctr;
+  61   1         CSN = 0;                   // Set CSN low, init SPI tranaction
+  62   1         status = SPI_RW(reg);    // Select register to write to and read status byte
+  63   1         for(byte_ctr=0; byte_ctr<bytes; byte_ctr++) // then write all byte in buffer(*pBuf)
+  64   1          SPI_RW(*pBuf++);
+  65   1         CSN = 1;                 // Set CSN high again
+  66   1         return(status);          // return nRF24L01 status byte
+  67   1      }
+  68          #if MODE    
+  69          /*******************************·¢*****ËÍ*****Ä£*****Ê½*****´ú*****Âë*************************************
+             -/
+  70          void TX_Mode(void)
+  71          {
+  72   1       CE=0;
+  73   1       
+  74   1       SPI_RW_Reg(FLUSH_TX,0x00);
+  75   1       SPI_Write_Buf(WRITE_REG + TX_ADDR, TX_ADDRESS, TX_ADR_WIDTH);    // Writes TX_Address to nRF24L01
+  76   1         SPI_Write_Buf(WRITE_REG + RX_ADDR_P0, TX_ADDRESS, TX_ADR_WIDTH); // RX_Addr0 same as TX_Adr for Auto.Ac
+             -k
+  77   1       SPI_RW_Reg(WRITE_REG + EN_AA, 0x01);      // Enable Auto.Ack:Pipe0
+  78   1         SPI_RW_Reg(WRITE_REG + EN_RXADDR, 0x01);  // Enable Pipe0
+  79   1         SPI_RW_Reg(WRITE_REG + SETUP_RETR, 0x1a); // 500us + 86us, 10 retrans...1a
+  80   1         SPI_RW_Reg(WRITE_REG + RF_CH, 40);        // Select RF channel 40 
+  81   1         SPI_RW_Reg(WRITE_REG + RF_SETUP, 0x07);   // TX_PWR:0dBm, Datarate:1Mbps, LNA:HCURR
+  82   1       SPI_RW_Reg(WRITE_REG + RX_PW_P0, RX_PLOAD_WIDTH); //ÉèÖÃ½ÓÊÕÊý¾Ý³¤¶È£¬±¾´ÎÉèÖÃÎª2×Ö½Ú
+  83   1         SPI_RW_Reg(WRITE_REG + CONFIG, 0x0e);
+  84   1       CE=1;
+  85   1      }
+  86          void Transmit(unsigned char * tx_buf)
+  87          {
+  88   1       CE=0;   //StandBy IÄ£Ê½ 
+  89   1       SPI_Write_Buf(WRITE_REG + RX_ADDR_P0, TX_ADDRESS, TX_ADR_WIDTH); // ×°ÔØ½ÓÊÕ¶ËµØÖ·
+  90   1       SPI_RW_Reg(FLUSH_TX,0x00);
+  91   1       SPI_Write_Buf(WR_TX_PLOAD, tx_buf, TX_PLOAD_WIDTH);     // ×°ÔØÊý¾Ý 
+  92   1       SPI_RW_Reg(WRITE_REG + CONFIG, 0x0e);      // IRQÊÕ·¢Íê³ÉÖÐ¶ÏÏìÓ¦£¬16Î»CRC£¬Ö÷·¢ËÍ
+  93   1       CE=1;   //ÖÃ¸ßCE£¬¼¤·¢Êý¾Ý·¢ËÍ
+  94   1      }
+  95          #else     
+              /*******************************½Ó*****ÊÕ*****Ä£*****Ê½*****´ú*****Âë*************************************
+             -/
+              unsigned char SPI_Read_Buf(unsigned char reg, unsigned char *pBuf, unsigned char uchars)
+              {
+               unsigned char status,uchar_ctr;
+               
+               CSN = 0;                      // Set CSN low, init SPI tranaction
+               status = SPI_RW(reg);         // Select register to write to and read status unsigned char
+               
+               for(uchar_ctr=0;uchar_ctr<uchars;uchar_ctr++)
+                pBuf[uchar_ctr] = SPI_RW(0);    // 
+               
+               CSN = 1;       
+               return(status);                    // return nRF24L01 status unsigned char
+              }
+              /******************************************************************************************************/
+              /*º¯Êý£ºunsigned char nRF24L01_RxPacket(unsigned char* rx_buf)
+C51 COMPILER V9.00   NRF24L01                                                              10/25/2014 16:15:50 PAGE 3   
+
+              /*¹¦ÄÜ£ºÊý¾Ý¶ÁÈ¡ºó·ÅÈçrx_buf½ÓÊÕ»º³åÇøÖÐ
+              /******************************************************************************************************/
+              unsigned char nRF24L01_RxPacket(unsigned char* rx_buf)
+              {
+                 unsigned char revale=0;
+               sta=SPI_Read(STATUS); // ¶ÁÈ¡×´Ì¬¼Ä´æÆäÀ´ÅÐ¶ÏÊý¾Ý½ÓÊÕ×´¿ö
+               if(RX_DR)    // ÅÐ¶ÏÊÇ·ñ½ÓÊÕµ½Êý¾Ý
+               {
+                  //CE = 0;    //SPIÊ¹ÄÜ
+                SPI_Read_Buf(RD_RX_PLOAD,rx_buf,RX_PLOAD_WIDTH);// read receive payload from RX_FIFO buffer
+                revale =1;   //¶ÁÈ¡Êý¾ÝÍê³É±êÖ¾
+               }
+               SPI_RW_Reg(WRITE_REG+STATUS,sta);   //½ÓÊÕµ½Êý¾ÝºóRX_DR,TX_DS,MAX_PT¶¼ÖÃ¸ßÎª1£¬Í¨¹ýÐ´1À´Çå³þÖÐ¶Ï±êÖ¾
+               return revale;
+              }
+              /****************************************************************************************************/
+              /*º¯Êý£ºvoid RX_Mode(void)
+              /*¹¦ÄÜ£ºÊý¾Ý½ÓÊÕÅäÖÃ 
+              /****************************************************************************************************/
+              void RX_Mode(void)
+              {
+               CE=0;
+               
+               SPI_RW_Reg(FLUSH_RX,0x00);
+               //SPI_Write_Buf(WRITE_REG + TX_ADDR, TX_ADDRESS, TX_ADR_WIDTH);    // Writes TX_Address to nRF24L01
+                 SPI_Write_Buf(WRITE_REG + RX_ADDR_P0, TX_ADDRESS, TX_ADR_WIDTH); // RX_Addr0 same as TX_Adr for Auto.Ac
+             -k
+                 
+               SPI_RW_Reg(WRITE_REG + EN_AA, 0x01);      // Enable Auto.Ack:Pipe0
+                 SPI_RW_Reg(WRITE_REG + EN_RXADDR, 0x01);  // Enable Pipe0
+                 //SPI_RW_Reg(WRITE_REG + SETUP_RETR, 0x1a); // 500us + 86us, 10 retrans...1a
+                 SPI_RW_Reg(WRITE_REG + RF_CH, 40);        // Select RF channel 40
+               SPI_RW_Reg(WRITE_REG + RX_PW_P0, RX_PLOAD_WIDTH); //ÉèÖÃ½ÓÊÕÊý¾Ý³¤¶È£¬±¾´ÎÉèÖÃÎª2×Ö½Ú
+                 SPI_RW_Reg(WRITE_REG + RF_SETUP, 0x07);   // TX_PWR:0dBm, Datarate:1Mbps, LNA:HCURR
+               SPI_RW_Reg(WRITE_REG + CONFIG, 0x0F);
+               CE=1;
+              }
+              #endif
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    272    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =     18       8
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =      1    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

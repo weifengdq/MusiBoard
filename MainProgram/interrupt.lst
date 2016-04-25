@@ -1,0 +1,169 @@
+C51 COMPILER V9.00   INTERRUPT                                                             10/25/2014 16:15:49 PAGE 1   
+
+
+C51 COMPILER V9.00, COMPILATION OF MODULE INTERRUPT
+OBJECT MODULE PLACED IN .\OUTPUT\interrupt.obj
+COMPILER INVOKED BY: D:\Program Files(x86)\keilC51\C51\BIN\C51.EXE SRC\interrupt.c LARGE BROWSE DEBUG OBJECTEXTEND PRINT
+                    -(.\interrupt.lst) OBJECT(.\OUTPUT\interrupt.obj)
+
+line level    source
+
+   1          #include "config0.h"
+   2          #include "lkb.h"
+   3          
+   4          bit LED_flag=0;
+   5          bit BEEP_flag=0;
+   6          bit KEY_flag=0;
+   7          bit ADC_flag=0;
+   8          bit MPU6050_flag=0;
+   9          bit HMC5883_flag=0;
+  10          bit Encoder_flag=0;
+  11          
+  12          bit Rotate_Dir=0;         //用于判断编码器旋转方向
+  13          int Cnt_Last;                      //记录上一次的捕获值
+  14          int Cnt_Now=500;                       //记录本次的捕获值
+  15          unsigned int Freq=0;
+  16          
+  17          //仅作参考，并未使用
+  18          void exint0() interrupt 0  using 2     //INT0中断入口
+  19          {
+  20   1              //先判断转向
+  21   1              if(B_Phase)     //如果B相脉冲为正电压，表示正转
+  22   1              {
+  23   2                      Rotate_Dir=1;
+  24   2                      Cnt_Now++;
+  25   2                      if(Cnt_Now>=1000)       Cnt_Now=0;
+  26   2                      Cnt_Last=Cnt_Now;
+  27   2              }
+  28   1              else
+  29   1              {
+  30   2                      Rotate_Dir=0;
+  31   2                      Cnt_Now--;
+  32   2                      if(Cnt_Now<=0)  Cnt_Now=1000;
+  33   2              }
+  34   1      }
+  35          
+  36          
+  37          //外部中断2服务程序
+  38          //void exint2() interrupt 10          //INT2中断入口    （下降沿）
+  39          //{
+  40          //      //先判断转向
+  41          //      if(B_Phase)     //如果B相脉冲为正电压，表示正转
+  42          //      {
+  43          //              Rotate_Dir=1;
+  44          //              Cnt_Now++;
+  45          //              if(Cnt_Now>=1000)       Cnt_Now=0;
+  46          //              Cnt_Last=Cnt_Now;
+  47          //      }
+  48          //      else
+  49          //      {
+  50          //              Rotate_Dir=0;
+  51          //              Cnt_Now--;
+  52          //              if(Cnt_Now<=0)  Cnt_Now=1000;
+  53          //      }       
+  54          //          
+C51 COMPILER V9.00   INTERRUPT                                                             10/25/2014 16:15:49 PAGE 2   
+
+  55          ////  INT_CLKO &= 0xEF;               //若需要手动清除中断标志,可先关闭中断,此时系统会自动清除内部的中断标
+             -志
+  56          ////  INT_CLKO |= 0x10;               //然后再开中断即可
+  57          //}
+  58          
+  59          /*********************************************
+  60          * Timer0中断服务程序
+  61          *********************************************/
+  62          void tm0_isr() interrupt 1 using 1         //10ms中断一次
+  63          {
+  64   1              static unsigned int i=0;        //用于LED
+  65   1              static unsigned int j=0;        //用于蜂鸣器
+  66   1              static unsigned int k=0;        //用于MPU6050
+  67   1      //      static unsigned int m=0;        //用于HMC5883L
+  68   1              static unsigned int n=0;        //用于ADC
+  69   1              static unsigned int p=0;        //用于编码器
+  70   1      
+  71   1              //使用Aslong的JGA25-371直流减速电机：334线编码器，减速比为 21.3，12V额定电压，额定转速201rpm
+  72   1              //那么额定转速下10ms输出脉冲数：201*21.3*334/60/100=238.3257个脉冲
+  73   1              unsigned char ch,cl;
+  74   1              static unsigned int temp=0;
+  75   1              static unsigned int temp_1=0;   //上次的值
+  76   1              cl=TL1; //先读低位（高位变得没那么快）
+  77   1              ch=TH1;
+  78   1              temp_1=temp;
+  79   1              temp=ch*256+cl; //用左移怎么实现？ ch<<8+cl
+  80   1              //if(temp>=temp_1) Freq=(temp-temp_1)/5;                        // *200/1000 kHz                          //20kHz 每5ms 计100个数
+  81   1              //else Freq=(65536-temp_1 + temp)/5;
+  82   1              if(temp>=temp_1) Freq=(temp-temp_1)*100;                        //1s的脉冲数，即频率
+  83   1              else Freq=(65536-temp_1 + temp)*100;
+  84   1      
+  85   1              p++;
+  86   1              if(p>=1)
+  87   1              {
+  88   2                      p=0;
+  89   2                      Encoder_flag=1;
+  90   2              }
+  91   1              
+  92   1              i++;
+  93   1              if(i>=100)
+  94   1              {
+  95   2                      i=0;
+  96   2                      LED_flag=1;
+  97   2              }
+  98   1      
+  99   1              Key_Scan(1,1);  //支持连按；按键消抖时间，10ms
+ 100   1              if(Key_Num)
+ 101   1              {
+ 102   2                      //if(Key_Num==10) BEEP_flag=1;  //按键10按下，蜂鸣器鸣响
+ 103   2                      KEY_flag=1;
+ 104   2              }       
+ 105   1              if(BEEP_flag)
+ 106   1              {
+ 107   2                      j++;
+ 108   2                      BEEP=~BEEP;     //10ms翻转一次，50Hz
+ 109   2                      if(j>10)        //响100ms
+ 110   2                      {
+ 111   3                              j=0;
+ 112   3                              BEEP_flag=0;
+ 113   3                              BEEP=0;            //关闭蜂鸣器
+ 114   3                      }
+ 115   2              }
+C51 COMPILER V9.00   INTERRUPT                                                             10/25/2014 16:15:49 PAGE 3   
+
+ 116   1      
+ 117   1              k++;
+ 118   1              if(k%2) //10ms采样一次
+ 119   1              {
+ 120   2                      //k=0;
+ 121   2                      MPU6050_flag=1;
+ 122   2              }
+ 123   1              else
+ 124   1                      HMC5883_flag=1;
+ 125   1      
+ 126   1      //      m++;
+ 127   1      //      if(m>=1)
+ 128   1      //      {
+ 129   1      //              m=0;
+ 130   1      //              HMC5883_flag=1;
+ 131   1      //      }
+ 132   1      
+ 133   1              n++;
+ 134   1              if(n>=1)        //ad: 10ms采样一次
+ 135   1              {
+ 136   2                      n=0;
+ 137   2                      ADC_flag=1;
+ 138   2              }
+ 139   1      
+ 140   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    464    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =     20    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =      8    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

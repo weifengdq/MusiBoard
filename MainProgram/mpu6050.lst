@@ -1,0 +1,303 @@
+C51 COMPILER V9.00   MPU6050                                                               10/25/2014 16:15:49 PAGE 1   
+
+
+C51 COMPILER V9.00, COMPILATION OF MODULE MPU6050
+OBJECT MODULE PLACED IN .\OUTPUT\mpu6050.obj
+COMPILER INVOKED BY: D:\Program Files(x86)\keilC51\C51\BIN\C51.EXE SRC\mpu6050.c LARGE BROWSE DEBUG OBJECTEXTEND PRINT(.
+                    -\mpu6050.lst) OBJECT(.\OUTPUT\mpu6050.obj)
+
+line level    source
+
+   1          #include "math.h"
+   2          #include "mpu6050.h"
+   3          #include "delay.h"
+   4          #include <intrins.h>
+   5          
+   6          float Accel_x;                                          //X轴加速度值暂存
+   7          float Accel_y;                                          //Y轴加速度值暂存
+   8          float Accel_z;                                          //由加速度计计算的倾斜角度
+   9          
+  10          float Gyro_y;        //Y轴陀螺仪数据暂存                                        //由角速度计算的倾斜角度
+  11          float Angle_ax;      //由加速度计算的倾斜角度
+  12          float Angle;         //小车最终倾斜角度
+  13          
+  14          //**************************************
+  15          //I2C起始信号
+  16          //**************************************
+  17          void I2C_Start()
+  18          {
+  19   1          SDA2 = 1;                    //拉高数据线
+  20   1          SCL2 = 1;                    //拉高时钟线
+  21   1          Delay_us(5);                 //延时
+  22   1          SDA2 = 0;                    //产生下降沿
+  23   1          Delay_us(5);                 //延时
+  24   1          SCL2 = 0;                    //拉低时钟线
+  25   1      }
+  26          //**************************************
+  27          //I2C停止信号
+  28          //**************************************
+  29          void I2C_Stop()
+  30          {
+  31   1          SDA2 = 0;                    //拉低数据线
+  32   1          SCL2 = 1;                    //拉高时钟线
+  33   1          Delay_us(5);                 //延时
+  34   1          SDA2 = 1;                    //产生上升沿
+  35   1          Delay_us(5);                 //延时
+  36   1      }
+  37          //**************************************
+  38          //I2C发送应答信号
+  39          //入口参数:ack (0:ACK 1:NAK)
+  40          //**************************************
+  41          void I2C_SendACK(unsigned char ack)
+  42          {
+  43   1          SDA2 = ack;                  //写应答信号
+  44   1          SCL2 = 1;                    //拉高时钟线
+  45   1          Delay_us(5);                 //延时
+  46   1          SCL2 = 0;                    //拉低时钟线
+  47   1          Delay_us(5);                 //延时
+  48   1      }
+  49          //**************************************
+  50          //I2C接收应答信号
+  51          //**************************************
+  52          unsigned char I2C_RecvACK(void)
+  53          {
+  54   1              SCL2=0;
+C51 COMPILER V9.00   MPU6050                                                               10/25/2014 16:15:49 PAGE 2   
+
+  55   1              Delay_us(5);
+  56   1              SDA2=1;
+  57   1              Delay_us(5);
+  58   1              SCL2=1;
+  59   1              Delay_us(5);
+  60   1              if(SDA2==1)
+  61   1              {
+  62   2                      SCL2=0;
+  63   2                      Delay_us(5);
+  64   2                      return 0;
+  65   2              }
+  66   1              SCL2=0;
+  67   1              Delay_us(5);
+  68   1              return 1;
+  69   1      
+  70   1      //    SCL2 = 1;                    //拉高时钟线
+  71   1      //    Delay_us(5);                 //延时
+  72   1      //    CY = SDA2;                   //读应答信号
+  73   1      //    SCL2 = 0;                    //拉低时钟线
+  74   1      //    Delay_us(5);                 //延时
+  75   1      //    return CY;
+  76   1      }
+  77          //**************************************
+  78          //向I2C总线发送一个字节数据
+  79          //**************************************
+  80          unsigned char I2C_SendByte(unsigned char dat)
+  81          {
+  82   1          unsigned char i;
+  83   1          for (i=0; i<8; i++)         //8位计数器
+  84   1          {
+  85   2                      SCL2 = 0;
+  86   2                      Delay_us(5);
+  87   2                      if(dat & 0x80) SDA2=1;
+  88   2                      else SDA2=0;            
+  89   2              dat <<= 1;              //移出数据的最高位
+  90   2              //SDA2 = CY;               //送数据口
+  91   2              SCL2 = 1;                //拉高时钟线
+  92   2              Delay_us(5);             //延时
+  93   2          }
+  94   1              SCL2 = 0;                //拉低时钟线
+  95   1          return I2C_RecvACK();
+  96   1      }
+  97          //**************************************
+  98          //从I2C总线接收一个字节数据
+  99          //**************************************
+ 100          unsigned char I2C_RecvByte()
+ 101          {
+ 102   1          unsigned char i;
+ 103   1          unsigned char dat = 0;
+ 104   1          SDA2 = 1;                    //使能内部上拉,准备读取数据,
+ 105   1          for (i=0; i<8; i++)         //8位计数器
+ 106   1          {
+ 107   2              dat <<= 1;
+ 108   2              SCL2 = 1;                //拉高时钟线
+ 109   2              Delay_us(5);             //延时
+ 110   2              dat |= SDA2;             //读数据               
+ 111   2              SCL2 = 0;                //拉低时钟线
+ 112   2              Delay_us(5);             //延时
+ 113   2          }
+ 114   1          return dat;
+ 115   1      }
+ 116          //**************************************
+C51 COMPILER V9.00   MPU6050                                                               10/25/2014 16:15:49 PAGE 3   
+
+ 117          //向I2C设备写入一个字节数据
+ 118          //**************************************
+ 119          void Single_WriteI2C(unsigned char REG_Address,unsigned char REG_data)
+ 120          {
+ 121   1          I2C_Start();                  //起始信号
+ 122   1          I2C_SendByte(SlaveAddress);   //发送设备地址+写信号
+ 123   1          I2C_SendByte(REG_Address);    //内部寄存器地址，
+ 124   1          I2C_SendByte(REG_data);       //内部寄存器数据，
+ 125   1          I2C_Stop();                   //发送停止信号
+ 126   1      }
+ 127          //**************************************
+ 128          //从I2C设备读取一个字节数据
+ 129          //**************************************
+ 130          unsigned char Single_ReadI2C(unsigned char REG_Address)
+ 131          {
+ 132   1              unsigned char REG_data;
+ 133   1              I2C_Start();                   //起始信号
+ 134   1              I2C_SendByte(SlaveAddress);    //发送设备地址+写信号
+ 135   1              I2C_SendByte(REG_Address);     //发送存储单元地址，从0开始      
+ 136   1              I2C_Start();                   //起始信号
+ 137   1              I2C_SendByte(SlaveAddress+1);  //发送设备地址+读信号
+ 138   1              REG_data=I2C_RecvByte();       //读出寄存器数据
+ 139   1              I2C_SendACK(1);                //接收应答信号
+ 140   1              I2C_Stop();                    //停止信号
+ 141   1              return REG_data;
+ 142   1      }
+ 143          
+ 144          
+ 145          //**************************************
+ 146          //初始化MPU6050
+ 147          //**************************************
+ 148          void MPU6050_Init(void)
+ 149          {
+ 150   1              Single_WriteI2C(PWR_MGMT_1, 0x00);      //解除休眠状态
+ 151   1              Single_WriteI2C(SMPLRT_DIV, 0x07);
+ 152   1              Single_WriteI2C(CONFIG_M, 0x06);
+ 153   1              Single_WriteI2C(GYRO_CONFIG, 0x18);
+ 154   1              Single_WriteI2C(ACCEL_CONFIG, 0x01);
+ 155   1      }
+ 156          //**************************************
+ 157          //合成数据
+ 158          //**************************************
+ 159          int GetData(unsigned char REG_Address_1)
+ 160          {
+ 161   1              unsigned char H,L;
+ 162   1              H=Single_ReadI2C(REG_Address_1);
+ 163   1              L=Single_ReadI2C(REG_Address_1+1);      //地址+1  变为低地址eg：ACCEL_XOUT_H    0x3B    ACCEL_XOUT_L    0x3C   “Get
+             -Data（ACCEL_XOUT_H）”代表合成的数据
+ 164   1              return (H<<8)+L;   //合成数据
+ 165   1      }
+ 166          
+ 167          //*********************************************************
+ 168          // 卡尔曼滤波
+ 169          //摘抄网上流行的代码
+ 170          //*********************************************************
+ 171          void Kalman_Filter(float Accel,float Gyro)              //加速度偏角 角速度
+ 172          {
+ 173   1              
+ 174   1              //******卡尔曼参数************
+ 175   1      //      float  Q_angle=0.001;  
+ 176   1      //      float  Q_gyro=0.003;
+ 177   1      //      float  R_angle=0.5;
+C51 COMPILER V9.00   MPU6050                                                               10/25/2014 16:15:49 PAGE 4   
+
+ 178   1      
+ 179   1              float  Q_bias, Angle_err;
+ 180   1              float  PCt_0, PCt_1, E;
+ 181   1              float  K_0, K_1, t_0, t_1;
+ 182   1              float  Pdot[4] ={0.0,0.0,0.0,0.0};
+ 183   1              float  PP[2][2] = { { 1.0, 0.0 },{ 0.0, 1.0 } };        
+ 184   1              
+ 185   1              Angle+=(Gyro - Q_bias)*dt; //先验估计
+ 186   1      
+ 187   1              
+ 188   1      //      Pdot[0]=Q_angle - PP[0][1] - PP[1][0]; // Pk-先验估计误差协方差微分
+ 189   1              Pdot[0]=0.001 - PP[0][1] - PP[1][0]; // Pk-先验估计误差协方差微分
+ 190   1      
+ 191   1              Pdot[1]=- PP[1][1];
+ 192   1              Pdot[2]=- PP[1][1];
+ 193   1      //      Pdot[3]=Q_gyro;
+ 194   1              Pdot[3]=0.003;
+ 195   1              
+ 196   1              PP[0][0] += Pdot[0] * dt;   // Pk-先验估计误差协方差微分的积分
+ 197   1              PP[0][1] += Pdot[1] * dt;   // =先验估计误差协方差
+ 198   1              PP[1][0] += Pdot[2] * dt;
+ 199   1              PP[1][1] += Pdot[3] * dt;
+ 200   1                      
+ 201   1              Angle_err = Accel - Angle;      //zk-先验估计
+ 202   1              
+ 203   1              PCt_0 = C_0 * PP[0][0];
+ 204   1              PCt_1 = C_0 * PP[1][0];
+ 205   1              
+ 206   1      //      E = R_angle + C_0 * PCt_0;
+ 207   1              E = 0.5 + C_0 * PCt_0;
+ 208   1              
+ 209   1              K_0 = PCt_0 / E;
+ 210   1              K_1 = PCt_1 / E;
+ 211   1              
+ 212   1              t_0 = PCt_0;
+ 213   1              t_1 = C_0 * PP[0][1];
+ 214   1      
+ 215   1      //      PP[0][0] -= K_0 * t_0;           //后验估计误差协方差
+ 216   1      //      PP[0][1] -= K_0 * t_1;
+ 217   1      //      PP[1][0] -= K_1 * t_0;
+ 218   1      //      PP[1][1] -= K_1 * t_1;
+ 219   1                      
+ 220   1              Angle   += K_0 * Angle_err;      //后验估计
+ 221   1              Q_bias  += K_1 * Angle_err;      //后验估计
+ 222   1              Gyro_y   = Gyro - Q_bias;        //输出值（后验估计）的微分=角速度
+ 223   1      
+ 224   1      }
+ 225          
+ 226          
+ 227          //*********************************************************
+ 228          // 倾角计算（卡尔曼滤波）
+ 229          //*********************************************************
+ 230          
+ 231          void Angle_Calcu(void)   
+ 232          {
+ 233   1              //------加速度-------------------------
+ 234   1              //范围为2g时，换算关系：16384 LSB/G
+ 235   1              //角度较小时，x=sinx得到角度（弧度），deg=rad*180/3.14
+ 236   1              //因为x>=sinx,故乘以1.3适当放大
+ 237   1              //注意小车前进方向在XY平面
+ 238   1              Accel_x  = (float)GetData(ACCEL_XOUT_H)/286.0f;   //读取X轴加速度
+ 239   1              Accel_y  = (float)GetData(ACCEL_ZOUT_H)/286.0f;   //读取Z轴加速度
+C51 COMPILER V9.00   MPU6050                                                               10/25/2014 16:15:49 PAGE 5   
+
+ 240   1              Accel_z  = sqrt(Accel_x*Accel_x+Accel_y*Accel_y);       //开方
+ 241   1              Accel_y  = (float)GetData(ACCEL_YOUT_H)/286.0f;   //读取Y轴加速度
+ 242   1              //Angle_ax = (Accel_x) /16384;   //去除零点偏移，计算得到角度（弧度）
+ 243   1              //Angle_ax = Angle_ax*1.2*180/3.14;     //弧度转换为度
+ 244   1              Angle_ax = 57.3*asin(Accel_x/Accel_z);  //计算加速度偏离x方向的角度，asinf(弧度)，两个16384约去了
+ 245   1              /*              
+ 246   1              Accel_x  = GetData(ACCEL_XOUT_H);         //读取X轴加速度
+ 247   1              Angle_ax = (Accel_x - 1100) /16384;   //去除零点偏移，计算得到角度（弧度）
+ 248   1              Angle_ax = Angle_ax*1.2*180/3.14;     //弧度转换为度
+ 249   1              UART1PutChar((char)Angle_ax);
+ 250   1              */
+ 251   1      
+ 252   1        //------角速度--------------------
+ 253   1              //范围为2000deg/s时，换算关系：16.4 LSB/(deg/s)
+ 254   1              //注意小车前进方向为X方向
+ 255   1              Gyro_y = (float)GetData(GYRO_YOUT_H);    //静止时Y轴输出为-30左右
+ 256   1              Gyro_y = -(Gyro_y)/16.4f;         //去除零点便偏移，计算角速度，负号为方向处理
+ 257   1              //Angle_gy = Angle_gy + Gyro_y*0.01;  //角速度积分的倾斜角度
+ 258   1              
+ 259   1              //-------卡尔曼滤波融合-------------------
+ 260   1      
+ 261   1              Kalman_Filter(Angle_ax,Gyro_y);  //卡尔曼滤波计算倾角，Angle,Angle_ax,Gyro_y均为全局变量
+ 262   1      
+ 263   1              //互补滤波
+ 264   1              //补偿原理是取当前倾角和加速度获得倾角差值进行放大，然后
+ 265   1              //与陀螺仪角速度叠加后再积分，从而使倾角最跟踪为加速度获得的角度
+ 266   1              //0.5为放大倍数，可调节补偿度；0.01为系统周期10ms
+ 267   1              //Angle = Angle + (((Angle_ax-Angle)*0.5 + Gyro_y)*0.01);*/
+ 268   1                                                                                                                                
+ 269   1      }  
+ 270          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   1595    ----
+   CONSTANT SIZE    =     32    ----
+   XDATA SIZE       =     24      86
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)
