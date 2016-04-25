@@ -5,7 +5,7 @@ For more information of MusiBoard, you can go to my CSDN blog: http://blog.csdn.
 Here is the resource of MusiBoard:
 ![MusiBoard](https://github.com/weifengdq/MusiBoardDemo/raw/master/MusiBoard.png)
 
-This is the DemoVideo of MusiBoard on Youku: <iframe height=498 width=510 src="http://player.youku.com/embed/XODExMjY3ODY0" frameborder=0 allowfullscreen></iframe>
+This is the DemoVideo of MusiBoard on Youku:<iframe height=498 width=510 src="http://player.youku.com/embed/XODExMjY3ODY0" frameborder=0 allowfullscreen></iframe>
 
 
 
