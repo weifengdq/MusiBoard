@@ -1,0 +1,18 @@
+".\OUTPUT\adc.obj",
+".\OUTPUT\ascii.obj",
+".\OUTPUT\delay.obj",
+".\OUTPUT\gb1616.obj",
+".\OUTPUT\gb3232.obj",
+".\OUTPUT\hmc5883l.obj",
+".\OUTPUT\image0.obj",
+".\OUTPUT\interrupt.obj",
+".\OUTPUT\lcd.obj",
+".\OUTPUT\lkb.obj",
+".\OUTPUT\main.obj",
+".\OUTPUT\mpu6050.obj",
+".\OUTPUT\nrf24l01.obj",
+".\OUTPUT\pca_pwm.obj",
+".\OUTPUT\timer.obj",
+".\OUTPUT\uart.obj" 
+TO ".\OUTPUT\receive" 
+PRINT(".\receive.m51") RAMSIZE(256) 

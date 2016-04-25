@@ -1,0 +1,18 @@
+<html>
+<body>
+<pre>
+<h1>µVision Build Log</h1>
+<h2>Project:</h2>
+C:\Users\weifengdq\Desktop\Ω” ’≥Ã–Ú\receive.uvproj
+Project File Date:  10/22/2014
+
+<h2>Output:</h2>
+Build target 'Target 1'
+linking...
+*** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
+    SEGMENT: ?PR?MULTIPLE_READ_HMC5883?HMC5883L
+*** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
+    SEGMENT: ?PR?ANGLE_CALCU?MPU6050
+Program Size: data=25.3 xdata=267 code=29688
+creating hex file from ".\OUTPUT\receive"...
+".\OUTPUT\receive" - 0 Error(s), 2 Warning(s).
