@@ -1,0 +1,398 @@
+C51 COMPILER V9.00   MAIN                                                                  10/22/2014 20:51:27 PAGE 1   
+
+
+C51 COMPILER V9.00, COMPILATION OF MODULE MAIN
+OBJECT MODULE PLACED IN .\OUTPUT\main.obj
+COMPILER INVOKED BY: D:\Program Files(x86)\keilC51\C51\BIN\C51.EXE SRC\main.c LARGE BROWSE DEBUG OBJECTEXTEND PRINT(.\ma
+                    -in.lst) OBJECT(.\OUTPUT\main.obj)
+
+line level    source
+
+   1          /**************************************************************************************
+   2          作    者：weifengdq（新浪微博：weifengdq）
+   3          注意事项：按ALT+F7 配置->Target->Memory Mode->Large:variables in XDATA,如果需要用到仿真,
+   4                            Debug中设置好仿真和串口号；
+   5                            初始化有液晶背光调节演示，需要把P19的跳线帽插到上面，使LCD背光引脚与P26相连,使
+   6                            用PWM1来调节液晶背光亮度;
+   7                            使用串口1的1通道发送数据打游戏：在lkb.h中增加了KEYMSG结构体
+   8          修改日期：2014/10/17
+   9          *************************************************************************************/
+  10          #include "config0.h"
+  11          #include "delay.h"
+  12          #include "lkb.h"
+  13          #include "timer.h"
+  14          #include "uart.h"
+  15          #include <stdio.h>                                                                               
+  16          #include "lcd.h"
+  17          #include "adc.h"
+  18          #include "mpu6050.h"
+  19          #include "image0.h"
+  20          #include "pca_pwm.h"
+  21          #include "hmc5883l.h"
+  22          #include "nrf24l01.h"
+  23          #include <math.h>
+  24          
+  25          unsigned int adc0,adc1,adc2,adc3,adc4;
+  26          float li_voltage=0;
+  27          
+  28          KEYMSG left;
+  29          KEYMSG right;
+  30          KEYMSG up;
+  31          KEYMSG down;
+  32          KEYMSG kb;
+  33          
+  34          /*可以使用单步仿真一步步查看效果*/
+  35          void main()
+  36          {       
+  37   1              unsigned int i;
+  38   1              unsigned int j;
+  39   1              unsigned int k;
+  40   1              unsigned char r_Angle=0;
+  41   1      //      unsigned int m;
+  42   1              float Last_HMC5883_Angle=0;
+  43   1      //      float Avg_HMC5883_Angle=0;
+  44   1      //      float Last_Avg_HMC5883_Angle=0;
+  45   1      //      float temp_HMC5883_Angle=0;
+  46   1              Delay_ms(10);   
+  47   1              Delay_us(10);
+  48   1      
+  49   1              /*2.2寸、320*240分辨率、SPI接口的LCD初始化,使用STC的硬件SPI,LCD驱动芯片为ILI9340C*/
+  50   1              LCD_LED=0;              //LCD背光最亮
+  51   1              SPI_Init();             //IAP15硬件SPI初始化,切换到了SPI的第二通道:SS/P24、MOSI/P23、MISO/P22、SCK/P21
+  52   1              LCD_Init();             //LCD初始化，厂家提供
+  53   1      
+  54   1              /*LCD休眠演示*/
+C51 COMPILER V9.00   MAIN                                                                  10/22/2014 20:51:27 PAGE 2   
+
+  55   1              LCD_Sleep();    //LCD进入休眠状态
+  56   1              Delay_ms(100);  
+  57   1              LCD_ExitSleep();//LCD退出休眠状态
+  58   1              /*LCD刷屏演示：红橙黄绿青蓝紫 白黑*/
+  59   1              LCD_Clear(Red); 
+  60   1              LCD_Clear(Orange);
+  61   1              LCD_Clear(Yellow);
+  62   1              LCD_Clear(Green);
+  63   1              LCD_Clear(Cyan);
+  64   1              LCD_Clear(Blue);
+  65   1              LCD_Clear(Purple);
+  66   1              LCD_Clear(White);
+  67   1              LCD_Clear(Black);
+  68   1              /*LCD画线、英文、汉字、数字显示测试*/
+  69   1              /*液晶屏左上角坐标为(0,0),右下角坐标为(239,319)*/
+  70   1              POINT_COLOR=Green; //全局变量
+  71   1              BACK_COLOR=Black;       //前景色类似于在黑板写字的各种颜色的粉笔，黑板的颜色就是背景色  
+  72   1              LCD_ShowString(0,0,"Hello,world!");     //从(0,0)坐标开始显示字符串“Hello,World!”
+  73   1              POINT_COLOR=Blue;                                       //可以随时更改画笔颜色，显示不同颜色的数字
+  74   1              LCD_DrawLine(100,0,240,15);                     //画一条线段，起始坐标(100,0),终点坐标(240,15)
+  75   1              LCD_Show2Num(0,16,65535,5);                     //从(0,16)坐标开始显示0~65535的数字，5为数字位数，即显示5位数字
+  76   1              LCD_ShowNum(100,16,987654321,9);        //从(100,16)坐标开始显示unsigned long型数字(0~4294967295),10为数字位数，
+             -即10位数字
+  77   1              POINT_COLOR=Yellow;
+  78   1              for(i=32;i<320;i+=16)
+  79   1              {
+  80   2                      LCD_ShowString(0,i,"abcdefghijklmnopqrstuvwxyz!");
+  81   2              }
+  82   1              LCD_LED=1;              //LCD背光关闭
+  83   1              Delay_ms(500);
+  84   1              LCD_LED=0;              //LCD背光最亮
+  85   1              Delay_ms(500);
+  86   1              LCD_Clear(Black);                                       //清屏：黑色
+  87   1              //LCD_Fill(120,120,160,160,Yellow);     //在矩形区域填充色块，在函数处按F12可以查看函数原型
+  88   1              LCD_ShowImage(gImage_musi,80,120,78,80);//显示彩色图像： 慕司LOGO
+  89   1              Delay_ms(2000);
+  90   1              LCD_Clear(Black);
+  91   1              POINT_COLOR=Red;
+  92   1              LCD_DrawRectangle(0,0,239,60);   //画矩形：对角坐标(左上、右下)为(0,0),(239,60)
+  93   1              POINT_COLOR=Purple;
+  94   1              LCD_ShowString(80,2,"慕司");     //显示16*16汉字
+  95   1              LCD_ShowString(16,22,"为一线微茫憧憬一意孤行，");
+  96   1              LCD_ShowString(8,42,"这众生芸芸谁不曾如此任性！");
+  97   1              POINT_COLOR=Cyan;
+  98   1              LCD_ShowGB3232(80,160,"青春");
+  99   1              POINT_COLOR=Green;
+ 100   1              LCD_DrawCircle(112,176,48);
+ 101   1              Delay_ms(500);
+ 102   1      
+ 103   1              PCA_PWM_Init();         //PWM初始化，切换到PWM的第三通道P25/P26/P27，这里仅使用了PWM1(P26,即LCD_LED引脚)
+ 104   1              LCD_LED=0;                      //LCD背光最亮
+ 105   1              for(i=255;i<=0;i--)     //液晶背光256级亮度调节演示:由亮到暗
+ 106   1              {
+ 107   2                      CCAP1H = CCAP1L = i;      //通过调节占空比来调节屏幕亮度
+ 108   2                      Delay_ms(20);
+ 109   2              }
+ 110   1              LCD_LED=1;                      //LCD背光关闭
+ 111   1              for(i=0;i<255;i++)      //液晶背光256级亮度调节演示:由暗到亮
+ 112   1              {
+ 113   2                      CCAP1H = CCAP1L = i;      //通过调节占空比来调节屏幕亮度
+ 114   2                      Delay_ms(20);
+ 115   2              }
+C51 COMPILER V9.00   MAIN                                                                  10/22/2014 20:51:27 PAGE 3   
+
+ 116   1              Delay_ms(1000);
+ 117   1              LCD_Clear(Black);
+ 118   1      
+ 119   1              LKB_Init();                             //LED Key Buzzer：LED、按键、蜂鸣器 初始化(设置蜂鸣器端口为推挽输出)
+ 120   1              Buzzer_Func(500,1000);  //蜂鸣器500Hz@1000ms
+ 121   1      
+ 122   1              ADC_Init();                        //AD初始化：设置P1的0 1 2 3(摇杆)4(锂电池电压)口为AD口，
+ 123   1              POINT_COLOR = Green;       //液晶屏画笔颜色
+ 124   1              BACK_COLOR=Black;          //背景色
+ 125   1              LCD_ShowString(0,0 ,"adc0:     ");
+ 126   1              LCD_ShowString(0,16,"adc1:     ");
+ 127   1              LCD_ShowString(120,0,"adc2:     ");
+ 128   1              LCD_ShowString(120,16,"adc3:     ");
+ 129   1              LCD_ShowString(0,32,"li_voltage:      V");
+ 130   1              LCD_ShowString(104,32,".");
+ 131   1      
+ 132   1              NRF24L01_Init();
+ 133   1              RX_Mode();                   //接收模式
+ 134   1              LCD_ShowString(0,48,"NRF24L01_State: Rx_Mode");
+ 135   1      
+ 136   1              MPU6050_Init();
+ 137   1              Delay_ms(100);
+ 138   1              POINT_COLOR = Red;
+ 139   1              LCD_DrawLine(0,319,239,319);
+ 140   1              LCD_DrawLine(0,139,239,139);
+ 141   1              LCD_DrawLine(0,229,239,229);
+ 142   1      
+ 143   1              HMC5883_Init();
+ 144   1              Delay_ms(100);
+ 145   1              POINT_COLOR = Green;
+ 146   1              LCD_DrawCircle(120,100,31);
+ 147   1              LCD_ShowString(0,64,"direction：");
+ 148   1      
+ 149   1      
+ 150   1      
+ 151   1              Timer_Init(100);         //每10ms中断一次,参数为百us：100*100us = 10ms
+ 152   1      
+ 153   1              UART_Init(115200);       //串口初始化，使用了串口1的第一通道，设置波特率115200，用于仿真时可以切换到第二通道P3
+             -6/P37
+ 154   1              SBUF=0;                          //这一句使用printf有时是必须的
+ 155   1      
+ 156   1              i=0;
+ 157   1              j=0;
+ 158   1              k=0;
+ 159   1      //      m=0;
+ 160   1              while(1)
+ 161   1              {
+ 162   2                      if(nRF24L01_RxPacket(Rx_Buf))
+ 163   2                      {
+ 164   3                              if( (Rx_Buf[0]==1) && (Rx_Buf[1]==2))   //校验前两个字节
+ 165   3                              {
+ 166   4                                      r_Angle=Rx_Buf[3];
+ 167   4                                      j++;
+ 168   4                                      if(j>=240)
+ 169   4                                      {
+ 170   5                                              j=0;
+ 171   5                                              LCD_Fill(0,140,239,318,Black);
+ 172   5                                              POINT_COLOR = Red;
+ 173   5                                              BACK_COLOR=Black;
+ 174   5                                              LCD_DrawLine(0,229,239,229);
+ 175   5                                              POINT_COLOR = Green;
+ 176   5                                      }
+C51 COMPILER V9.00   MAIN                                                                  10/22/2014 20:51:27 PAGE 4   
+
+ 177   4                                      if(Rx_Buf[2]=='+')
+ 178   4                                      {
+ 179   5                                              LCD_DrawPoint(j,229-r_Angle);
+ 180   5                                      }
+ 181   4                                      else
+ 182   4                                      {
+ 183   5                                              LCD_DrawPoint(j,229+r_Angle);   
+ 184   5                                      }
+ 185   4      //                              POINT_COLOR = Black;
+ 186   4      //                              LCD_DrawLine(j+1,140,j+1,238);  //也可以用填充
+ 187   4      //                              LCD_DrawLine(j+2,140,j+2,238);
+ 188   4      //                              LCD_DrawLine(j+3,140,j+3,238);
+ 189   4      //                              POINT_COLOR = Red;
+ 190   4      //                              LCD_DrawPoint(j+1,229);
+ 191   4      //                              LCD_DrawPoint(j+2,229);
+ 192   4      //                              LCD_DrawPoint(j+3,229);
+ 193   4      //                              POINT_COLOR = Green;
+ 194   4                              }
+ 195   3                      }               
+ 196   2      
+ 197   2      
+ 198   2      
+ 199   2      
+ 200   2                      if(LED_flag)             //每1s切换一次LED的状态
+ 201   2                      {
+ 202   3                              LED_flag=0;
+ 203   3                              LED1 = ~LED1;
+ 204   3                      }
+ 205   2      
+ 206   2                      //MPU6050的几个函数使用了Delay_us(5);
+ 207   2                      if(MPU6050_flag)
+ 208   2                      {
+ 209   3                              MPU6050_flag=0;
+ 210   3                              //Angle_Calcu();                //倾角计算 将得到下面两个全局变量,使用了网上摘抄的卡尔曼滤波
+ 211   3                                                                      //float Angle;   //最终倾斜角度
+ 212   3                                                                      //float Gyro_y;  //Y轴角速度
+ 213   3                              //printf("%.2f,%.2f\n",Angle,Gyro_y);
+ 214   3      //                      j++;
+ 215   3      //                      if(j>=240)
+ 216   3      //                      {
+ 217   3      //                              j=0;
+ 218   3      //                              LCD_Fill(0,140,239,318,Black);
+ 219   3      //                              POINT_COLOR = Red;
+ 220   3      //                              BACK_COLOR=Black;
+ 221   3      //                              LCD_DrawLine(0,229,239,229);
+ 222   3      //                              POINT_COLOR = Green;
+ 223   3      //                      }
+ 224   3      //                      if((int)Angle>-90 && (int)Angle<90 )      //排除初始不稳定杂波
+ 225   3      //                      {
+ 226   3      //                              LCD_DrawPoint(j,229-(int)Angle);
+ 227   3      //                              //通过NRF24L01发送出去
+ 228   3      //                              Tx_Buf[2]       =(unsigned char)Angle;  
+ 229   3      //                              //Tx_Buf[3]     =(int)Angle>>8;         
+ 230   3      //                              Transmit(Tx_Buf);                       //24L01发送缓冲数组
+ 231   3      //                              sta=SPI_Read(READ_REG +  STATUS);       //读24L01的状态寄存器
+ 232   3      //                              if(TX_DS)       //sbit TX_DS =sta^5;数据发送完成中断，接收到应答信号时此位置1，写1清除中断
+ 233   3      //                              {  
+ 234   3      //                                      //Delay_ms(5); 
+ 235   3      //                                      SPI_RW_Reg(WRITE_REG + STATUS,sta);  //写状态寄存器，清除中断
+ 236   3      //                              }
+ 237   3      //                              if(MAX_RT)  //如果是发送超时  sbit MAX_RT =sta^4;
+ 238   3      //                              {                       //达到最多次重发中断，MAX_RT中断产生则必须清除后系统才能进行通讯，写1清除中断
+C51 COMPILER V9.00   MAIN                                                                  10/22/2014 20:51:27 PAGE 5   
+
+ 239   3      //                                      //Delay_ms(5);  
+ 240   3      //                                      SPI_RW_Reg(WRITE_REG + STATUS,sta);
+ 241   3      //                              }
+ 242   3      //                      }
+ 243   3                      }
+ 244   2      
+ 245   2                      if(HMC5883_flag)
+ 246   2                      {
+ 247   3                              HMC5883_flag=0;
+ 248   3      //                      Multiple_Read_HMC5883();                                  //角度的变化似乎并不是线性的
+ 249   3      //                      LCD_Show2Num(32,80,(int)HMC5883_Angle,3); 
+ 250   3      //                      POINT_COLOR=BACK_COLOR;                                    //三角函数使用弧度而不是度!
+ 251   3      //                      LCD_DrawLine(120,100,120+(int)(28.0*cos((Last_HMC5883_Angle-180.0)/57.3)),100+(int)(28.0*sin((Last_HM
+             -C5883_Angle-180.0)/57.3)));
+ 252   3      //                      POINT_COLOR=Yellow;
+ 253   3      //                      LCD_DrawLine(120,100,120+(int)(28.0*cos((HMC5883_Angle-180.0)/57.3)),100+(int)(28.0*sin((HMC5883_Angl
+             -e-180.0)/57.3)));
+ 254   3      //                      Last_HMC5883_Angle=HMC5883_Angle;
+ 255   3      //                      //平均值滤波
+ 256   3      //                      m++;
+ 257   3      //                      temp_HMC5883_Angle+=HMC5883_Angle;      
+ 258   3      //                      if(m==5)
+ 259   3      //                      {
+ 260   3      //                              m=0;
+ 261   3      //                              Avg_HMC5883_Angle=temp_HMC5883_Angle/5.0;        //与前面四个值相关联
+ 262   3      //                              //printf("\n\n%.2f\n\n",HMC5883_Angle);   //HMC5883_Angle: float型，0~360
+ 263   3      //                              LCD_Show2Num(32,80,(int)Avg_HMC5883_Angle,3); 
+ 264   3      //                              POINT_COLOR=BACK_COLOR;
+ 265   3      //                              LCD_DrawLine(120,100,120+28*cos((Last_Avg_HMC5883_Angle-180.0)/57.3),100+28*sin((Last_Avg_HMC5883_An
+             -gle-180.0)/57.3));
+ 266   3      //                              POINT_COLOR=Yellow;
+ 267   3      //                              LCD_DrawLine(120,100,120+28*cos((Avg_HMC5883_Angle-180.0)/57.3),100+28*sin((Avg_HMC5883_Angle-180.0)
+             -/57.3));
+ 268   3      //                              Last_Avg_HMC5883_Angle=Avg_HMC5883_Angle;
+ 269   3      //                      } 
+ 270   3                      }
+ 271   2                      
+ 272   2                      if(ADC_flag)
+ 273   2                      {
+ 274   3                              ADC_flag=0;
+ 275   3                              POINT_COLOR= Green;
+ 276   3                              i++;
+ 277   3                              switch(i)
+ 278   3                              {
+ 279   4                                      case 1: adc0=(int)ADC_GetResult(0);LCD_Show2Num(48,0,adc0,3); break;
+ 280   4                                      case 2: adc1=(int)ADC_GetResult(1);LCD_Show2Num(48,16,adc1,3); break;
+ 281   4                                      case 3: adc2=(int)ADC_GetResult(2);LCD_Show2Num(168,0,adc2,3); break;
+ 282   4                                      case 4: adc3=(int)ADC_GetResult(3);LCD_Show2Num(168,16,adc3,3); break;
+ 283   4                                      case 5: li_voltage=(float)ADC_GetResult(4)*0.019f; break; //adc4*3.3/256*(6.8+3.3)/6.8=adc4*0.019
+ 284   4                                      default:
+ 285   4                                              i=0;
+ 286   4                                              LCD_Show2Num(96,32,(int)li_voltage,1);                          //显示整数部分
+ 287   4                                              LCD_Show2Num(112,32,((int)(li_voltage*100))%100,2); //显示小数部分
+ 288   4                                              //printf("%d,%d,%d,%d,%.2f\n",adc0,adc1,adc2,adc3,li_voltage);
+ 289   4                               }//switch 结束
+ 290   3      
+ 291   3                              k++;
+ 292   3                              //printf("%d,%d,", adc1, adc0);
+ 293   3                              if(k%2)
+ 294   3                              {
+ 295   4                                      if(adc1>=0 && adc1<=80) 
+ 296   4                                      {
+C51 COMPILER V9.00   MAIN                                                                  10/22/2014 20:51:27 PAGE 6   
+
+ 297   5                                              sendMsg(&up, 1, 1);
+ 298   5                                      }
+ 299   4                                      else if(adc1>=170 && adc1<=255) 
+ 300   4                                      {
+ 301   5                                              sendMsg(&down, 4, 1);                                    
+ 302   5                                      }
+ 303   4                                      else 
+ 304   4                                      {
+ 305   5                                              if(up.msg == 1)
+ 306   5                                              {
+ 307   6                                                      sendMsg(&up, 1, 0);
+ 308   6                                              }
+ 309   5                                              else if(down.msg == 1)
+ 310   5                                              {
+ 311   6                                                      sendMsg(&down, 4, 0);
+ 312   6                                              }
+ 313   5                                      }
+ 314   4                              }
+ 315   3                              else
+ 316   3                              {
+ 317   4                                      if(adc0>=0 && adc0<=80) 
+ 318   4                                      {
+ 319   5                                              sendMsg(&left, 3, 1);
+ 320   5                                      }
+ 321   4                                      else if(adc0>=170 && adc0<=255) 
+ 322   4                                      {
+ 323   5                                              sendMsg(&right, 2, 1);                                   
+ 324   5                                      }
+ 325   4                                      else 
+ 326   4                                      {
+ 327   5                                              if(left.msg == 1)
+ 328   5                                              {
+ 329   6                                                      sendMsg(&left, 3, 0);
+ 330   6                                              }
+ 331   5                                              else if(right.msg == 1)
+ 332   5                                              {
+ 333   6                                                      sendMsg(&right, 2, 0);
+ 334   6                                              }
+ 335   5                                      }
+ 336   4                              }       
+ 337   3                      }
+ 338   2      
+ 339   2                      //interrupt.c中把Key_Scan()改成支持连按
+ 340   2                      //uart.c中把串口1切换回P30/P31
+ 341   2                      if(KEY_flag)
+ 342   2                      {       
+ 343   3                              if (key_up==0)
+ 344   3                              {
+ 345   4                                      sendMsg(&kb, Key_Num, 1);        //sendMsg()函数里面有printf
+ 346   4                              }
+ 347   3                              else  //if(key_up == 1) 
+ 348   3                              {
+ 349   4                                      KEY_flag=0;
+ 350   4                                      if (kb.msg == 1) ;
+ 351   4                                              sendMsg(&kb, kb.key, 0);
+ 352   4                              }
+ 353   3                              //printf("%d\n",Key_Num);
+ 354   3                      }
+ 355   2              }               
+ 356   1      }
+
+
+C51 COMPILER V9.00   MAIN                                                                  10/22/2014 20:51:27 PAGE 7   
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   1855    ----
+   CONSTANT SIZE    =    204    ----
+   XDATA SIZE       =     34      11
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)
